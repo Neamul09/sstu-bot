@@ -1,0 +1,372 @@
+from telegram import Update, InlineKeyboardButton, ReplyKeyboardRemove
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ConversationHandler
+from database import Database
+from utils.timezone import get_now, format_time, get_day_of_week
+from utils.helpers import build_menu, get_cancel_button
+from config import Config
+from telegram.error import BadRequest
+from utils.i18n import t
+import datetime
+
+DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+# States for Adding Timetable
+SUBJ, DAY, START, END, ROOM = range(5)
+
+
+async def view_timetable(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user = Database.get_user(user_id)
+    
+    if not user:
+        await update.message.reply_text("❌ You are not registered yet. Use /start")
+        return
+
+    lang = user.get("language", "en")
+
+    # Base class id
+    class_id = f"{user['department']}_{user['semester']}"
+    
+    # Check if called from a button or command
+    query = update.callback_query
+    day = get_day_of_week() # Default to today
+    
+    if query:
+        await query.answer()
+        if query.data.startswith("ttt_"):
+            try:
+                day = int(query.data.split("_")[1])
+            except (ValueError, IndexError):
+                pass # Fallback to today already set
+    
+    slots = Database.get_timetable(class_id, day)
+    
+    day_name = DAYS[day]
+    text = f"📅 *Timetable for {day_name}*\n_Class: {user['department']} Semester {user['semester']}_\n\n"
+    
+    if not slots:
+        text += "🌴 No classes scheduled for this day."
+    else:
+        current_date_str = get_now().strftime("%Y-%m-%d")
+        for slot in slots:
+            # Check for Cancellation
+            is_cancelled = Database.is_class_cancelled(slot['id'], current_date_str)
+            # Check for Reschedule Override
+            overrides = Database.get_class_overrides(slot['id'], current_date_str)
+            override = overrides[0] if overrides else None
+
+            if is_cancelled:
+                text += f"❌ ~~*{slot['subject']}*~~ [CANCELLED]\n"
+                text += f"   🕒 {slot['start_time'][:5]} - {slot['end_time'][:5]}\n"
+            elif override:
+                text += f"🕒 *{slot['subject']}* [RESCHEDULED]\n"
+                text += f"   🕒 *{override['new_start_time'][:5]}* (Originally {slot['start_time'][:5]})\n"
+                if override.get('new_room'):
+                    text += f"   📍 Room: {override['new_room']}\n"
+                else:
+                    text += f"   📍 Room: {slot['room']}\n"
+            else:
+                text += f"🔹 *{slot['subject']}*\n"
+                text += f"   🕒 {slot['start_time'][:5]} - {slot['end_time'][:5]}\n"
+                if slot['room']:
+                    text += f"   📍 Room: {slot['room']}\n"
+            
+            # If authorized, add management label with slot ID
+            if user["role"] in [Config.ROLE_CR, Config.ROLE_TEACHER, Config.ROLE_ADMIN]:
+                text += f"   `[ID: {slot['id'][:4]}]`"
+            text += "\n\n"
+    
+    # Build inline keyboard to switch days
+    buttons = [
+        InlineKeyboardButton("Prev Day", callback_data=f"ttt_{(day-1)%7}"),
+        InlineKeyboardButton("Today", callback_data=f"ttt_{get_day_of_week()}"),
+        InlineKeyboardButton("Next Day", callback_data=f"ttt_{(day+1)%7}")
+    ]
+    # If CR/TEACHER, add management buttons
+    footer = []
+    
+    # Always add the "Official Routine View" button if available
+    footer.append(InlineKeyboardButton(t("btn_routine_img", lang), callback_data="view_routine_img"))
+
+    if user["role"] in [Config.ROLE_CR, Config.ROLE_TEACHER, Config.ROLE_ADMIN]:
+        footer.append(InlineKeyboardButton("➕ Add New Class", callback_data="add_slot_trigger"))
+        footer.append(InlineKeyboardButton(t("btn_upload_routine", lang), callback_data="upload_routine_trigger"))
+        # Add delete buttons for today's slots
+        if slots:
+            for slot in slots:
+                footer.append(InlineKeyboardButton(f"🗑️ Del {slot['subject'][:10]}", callback_data=f"delslot_{slot['id']}"))
+        
+    reply_markup = build_menu(buttons, n_cols=3, footer_buttons=footer)
+
+    if query:
+        try:
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+        except BadRequest:
+            pass # Message perfectly matches, nothing to edit
+    else:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+
+# --- Add Slot Conversation ---
+
+async def add_slot_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if query:
+        await query.answer()
+        user_id = query.from_user.id
+    else:
+        user_id = update.effective_user.id
+        
+    user = Database.get_user(user_id)
+    if not user or user["role"] not in [Config.ROLE_CR, Config.ROLE_TEACHER, Config.ROLE_ADMIN]:
+        msg = "❌ Only CRs or Teachers can add slots."
+        if query: await query.edit_message_text(msg)
+        else: await update.message.reply_text(msg)
+        return ConversationHandler.END
+
+    text = "📝 *Add New Class Slot*\n\nPlease type the *Subject Name* (e.g., Data Structures):"
+    
+    if query:
+        await query.edit_message_text(text, parse_mode="Markdown")
+    else:
+        await update.message.reply_text(text, parse_mode="Markdown")
+        
+    return SUBJ
+
+async def add_slot_subj(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["tmp_slot"] = {"subject": update.message.text}
+    
+    buttons = [InlineKeyboardButton(day[:3], callback_data=f"addday_{i}") for i, day in enumerate(DAYS)]
+    reply_markup = build_menu(buttons, n_cols=4, footer_buttons=get_cancel_button())
+    
+    await update.message.reply_text(
+        f"Subject: *{update.message.text}*\n\nSelect the day of the week:", 
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+    return DAY
+
+async def add_slot_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "cancel_action":
+        await query.edit_message_text("❌ Action Cancelled.")
+        return ConversationHandler.END
+        
+    day_idx = int(query.data.split("_")[1])
+    context.user_data["tmp_slot"]["day_of_week"] = day_idx
+    
+    day_name = DAYS[day_idx]
+    
+    await query.edit_message_text(
+        text=f"Day: *{day_name}*\n\nPlease type the *Start Time* (HH:MM in 24h format, e.g., 09:30):",
+        parse_mode="Markdown"
+    )
+    return START
+
+async def add_slot_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text.lower() == "/cancel":
+        await update.message.reply_text("❌ Action Cancelled.")
+        return ConversationHandler.END
+        
+    try:
+        # Validate time format
+        datetime.datetime.strptime(update.message.text, "%H:%M")
+        context.user_data["tmp_slot"]["start_time"] = update.message.text
+        
+        await update.message.reply_text(
+            f"Start Time: *{update.message.text}*\n\nPlease type the *End Time* (HH:MM):",
+            parse_mode="Markdown"
+        )
+        return END
+    except ValueError:
+        await update.message.reply_text("⚠️ Invalid time format. Please use *HH:MM* (e.g., 14:00).\nOr type /cancel.")
+        return START
+
+async def add_slot_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text.lower() == "/cancel":
+        await update.message.reply_text("❌ Action Cancelled.")
+        return ConversationHandler.END
+        
+    try:
+        datetime.datetime.strptime(update.message.text, "%H:%M")
+        context.user_data["tmp_slot"]["end_time"] = update.message.text
+        
+        # Room selection can be None
+        buttons = [InlineKeyboardButton("Skip / No Room", callback_data="skip_room")]
+        reply_markup = build_menu(buttons, n_cols=1)
+        
+        await update.message.reply_text(
+            f"End Time: *{update.message.text}*\n\nPlease type the *Room Number/Name*:",
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+        return ROOM
+    except ValueError:
+        await update.message.reply_text("⚠️ Invalid time format. Please use *HH:MM* (e.g., 15:30).\nOr type /cancel.")
+        return END
+
+async def process_slot_saving(user_id, slot_data):
+    user = Database.get_user(user_id)
+    class_id = f"{user['department']}_{user['semester']}"
+    slot_data["class_id"] = class_id
+    Database.add_timetable_slot(slot_data)
+
+async def add_slot_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # This could be a text message OR a callback query (skip)
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        room = None
+        user_id = query.from_user.id
+        msg_obj = query.message
+    else:
+        if update.message.text.lower() == "/cancel":
+            await update.message.reply_text("❌ Action Cancelled.")
+            return ConversationHandler.END
+        room = update.message.text
+        user_id = update.effective_user.id
+        msg_obj = update.message
+
+    context.user_data["tmp_slot"]["room"] = room
+    slot_data = context.user_data["tmp_slot"]
+    
+    await process_slot_saving(user_id, slot_data)
+    
+    # Broadcast Notification
+    from database import supabase
+    dept, sem = slot_data["class_id"].split("_")
+    class_users = supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).neq("id", user_id).execute().data
+    
+    user = Database.get_user(user_id)
+    for u in class_users:
+        try:
+            msg = f"🔔 *New Class Added by {user['full_name']}*\n" \
+                  f"Subject: *{slot_data['subject']}*\n" \
+                  f"Day: {DAYS[slot_data['day_of_week']]}\n" \
+                  f"Time: {slot_data['start_time']} - {slot_data['end_time']}"
+            await context.bot.send_message(u["id"], msg, parse_mode="Markdown")
+        except:
+            pass
+    
+    success_text = f"✅ Success! *{slot_data['subject']}* mapped to {DAYS[slot_data['day_of_week']]}."
+    
+    if update.callback_query:
+        await msg_obj.edit_text(success_text, parse_mode="Markdown")
+    else:
+        await msg_obj.reply_text(success_text, parse_mode="Markdown")
+        
+    return ConversationHandler.END
+
+# Common Cancel Handler
+async def cancel_global(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text("❌ Action Cancelled.")
+    else:
+        await update.message.reply_text("❌ Action Cancelled.")
+    return ConversationHandler.END
+
+# --- Routine Image Management ---
+
+async def view_routine_img(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user = Database.get_user(query.from_user.id)
+    class_id = f"{user['department']}_{user['semester']}"
+    lang = user.get("language", "en")
+    
+    config = Database.get_class_config(class_id)
+    if not config or not config.get("routine_image_id"):
+        msg = "❌ No routine image has been uploaded for this class yet."
+        if user["role"] in [Config.ROLE_CR, Config.ROLE_TEACHER, Config.ROLE_ADMIN]:
+            msg += "\n\nUse the '📤 Upload Routine' button to add one."
+        await query.message.reply_text(msg)
+        return
+        
+    await context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=config["routine_image_id"],
+        caption=f"🖼️ *Official Routine - {class_id}*",
+        parse_mode="Markdown"
+    )
+
+# States for Routine Upload
+UPLOAD_IMG = range(10, 11)
+
+async def upload_routine_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user = Database.get_user(query.from_user.id)
+    lang = user.get("language", "en")
+    
+    if user["role"] not in [Config.ROLE_CR, Config.ROLE_TEACHER, Config.ROLE_ADMIN]:
+        await query.edit_message_text("❌ Unauthorized.")
+        return ConversationHandler.END
+
+    await query.edit_message_text(t("ask_routine_img", lang), parse_mode="Markdown")
+    return UPLOAD_IMG
+
+    return UPLOAD_IMG
+
+async def handle_routine_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.photo:
+        await update.message.reply_text("⚠️ Please send a *Photo* of the routine.")
+        return UPLOAD_IMG
+        
+    user = Database.get_user(update.effective_user.id)
+    class_id = f"{user['department']}_{user['semester']}"
+    file_id = update.message.photo[-1].file_id
+    
+    Database.set_class_config(class_id, {"routine_image_id": file_id})
+    
+    await update.message.reply_text(t("routine_updated", user.get("language", "en")), parse_mode="Markdown")
+    return ConversationHandler.END
+
+async def delete_slot_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user = Database.get_user(query.from_user.id)
+    if user["role"] not in [Config.ROLE_CR, Config.ROLE_TEACHER, Config.ROLE_ADMIN]:
+        return
+        
+    slot_id = query.data.split("_")[1]
+    Database.delete_timetable_slot(slot_id)
+    
+    await query.message.reply_text("✅ Slot permanently deleted from the routine.")
+    await view_timetable(update, context)
+
+# exports ...
+timetable_view_handler = CommandHandler("timetable", view_timetable)
+timetable_nav_handler = CallbackQueryHandler(view_timetable, pattern="^ttt_")
+routine_view_handler = CallbackQueryHandler(view_routine_img, pattern="^view_routine_img$")
+slot_delete_handler = CallbackQueryHandler(delete_slot_callback, pattern="^delslot_")
+
+routine_upload_handler = ConversationHandler(
+    entry_points=[CallbackQueryHandler(upload_routine_trigger, pattern="^upload_routine_trigger$")],
+    states={
+        UPLOAD_IMG: [MessageHandler(filters.PHOTO, handle_routine_upload)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel_global)]
+)
+
+timetable_add_handler = ConversationHandler(
+    entry_points=[
+        CommandHandler("add_slot", add_slot_trigger),
+        CallbackQueryHandler(add_slot_trigger, pattern="^add_slot_trigger$")
+    ],
+    states={
+        SUBJ: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_slot_subj)],
+        DAY: [CallbackQueryHandler(add_slot_day, pattern="^(addday_|cancel_action)")],
+        START: [MessageHandler(filters.TEXT, add_slot_start_time)],
+        END: [MessageHandler(filters.TEXT, add_slot_end_time)],
+        ROOM: [
+            MessageHandler(filters.TEXT, add_slot_room),
+            CallbackQueryHandler(add_slot_room, pattern="^skip_room$")
+        ],
+    },
+    fallbacks=[CommandHandler("cancel", cancel_global)]
+)
