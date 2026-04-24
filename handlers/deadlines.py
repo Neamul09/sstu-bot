@@ -1,14 +1,14 @@
 from telegram import Update, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ConversationHandler
 from database import Database
-from utils.timezone import get_now
+from utils.timezone import get_now, parse_time
 from utils.helpers import build_menu, get_cancel_button
 from config import Config
 import datetime
 import pytz
 
 # States
-TITLE, TYPE, DUE_DATE, DUE_TIME = range(4)
+TITLE, DESC, TYPE, DUE_DATE, DUE_TIME = range(5)
 
 async def view_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -36,6 +36,8 @@ async def view_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
             urgency = "🔴" if time_left.total_seconds() < 172800 else "🕒" # less than 48 hours
             
             text += f"📌 *{d['title']}* [{d['type']}]\n"
+            if d.get('description'):
+                text += f"   📝 _{d['description']}_\n"
             text += f"   {urgency} *{local_due.strftime('%d %b, %I:%M %p')}*\n"
             if d.get('file_id'):
                 text += "   📎 _Attachment in History_\n"
@@ -103,6 +105,20 @@ async def add_deadline_title(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "file_type": None
         }
     
+    await update.message.reply_text(
+        f"Title: *{context.user_data['tmp_deadline']['title']}*\n\nPlease type a *Description* for this deadline, or type /skip to leave it empty:",
+        parse_mode="Markdown"
+    )
+    return DESC
+
+async def add_deadline_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text.lower() == "/cancel":
+        await update.message.reply_text("❌ Action Cancelled.")
+        return ConversationHandler.END
+        
+    desc = None if update.message.text.lower() == "/skip" else update.message.text
+    context.user_data["tmp_deadline"]["description"] = desc
+    
     buttons = [
         InlineKeyboardButton("📚 ASSIGNMENT", callback_data="type_ASSIGNMENT"),
         InlineKeyboardButton("📝 EXAM", callback_data="type_EXAM"),
@@ -111,7 +127,7 @@ async def add_deadline_title(update: Update, context: ContextTypes.DEFAULT_TYPE)
     reply_markup = build_menu(buttons, n_cols=2)
     
     await update.message.reply_text(
-        f"Title: *{context.user_data['tmp_deadline']['title']}*\n\nSelect the type of deadline:",
+        "Select the type of deadline:",
         reply_markup=reply_markup,
         parse_mode="Markdown"
     )
@@ -144,7 +160,7 @@ async def add_deadline_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["tmp_deadline"]["date"] = update.message.text
         
         await update.message.reply_text(
-            f"Date: *{update.message.text}*\n\nPlease type the *Due Time* (Format: HH:MM in 24h):",
+            f"Date: *{update.message.text}*\n\nPlease type the *Due Time* (e.g., 23:59 or 11:59 PM):",
             parse_mode="Markdown"
         )
         return DUE_TIME
@@ -158,8 +174,7 @@ async def add_deadline_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     try:
-        time_str = update.message.text
-        datetime.datetime.strptime(time_str, "%H:%M")
+        time_str = parse_time(update.message.text)
         
         date_str = context.user_data["tmp_deadline"]["date"]
         full_dt_str = f"{date_str} {time_str}"
@@ -174,6 +189,7 @@ async def add_deadline_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         deadline_data = {
             "class_id": class_id,
             "title": context.user_data["tmp_deadline"]["title"],
+            "description": context.user_data["tmp_deadline"]["description"],
             "type": context.user_data["tmp_deadline"]["type"],
             "due_datetime": utc_dt,
             "file_id": context.user_data["tmp_deadline"].get("file_id")
@@ -185,12 +201,16 @@ async def add_deadline_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Broadcast Notification
         from database import supabase
         dept, sem = class_id.split("_")
-        class_users = supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).neq("id", user.get('id')).execute().data
+        class_users = supabase.table("users").select("id, pref_deadline_reminders").eq("department", dept).eq("semester", int(sem)).neq("id", user.get('id')).execute().data
         for u in class_users:
+            if not u.get("pref_deadline_reminders", True):
+                continue
             try:
                 msg = f"🔔 *New Deadline Added by {user['full_name']}*\n" \
-                      f"Title: *{deadline_data['title']}* [{deadline_data['type']}]\n" \
-                      f"Due: {local_dt.strftime('%d %b, %Y at %I:%M %p')}"
+                      f"Title: *{deadline_data['title']}* [{deadline_data['type']}]\n"
+                if deadline_data.get('description'):
+                    msg += f"Description: _{deadline_data['description']}_\n"
+                msg += f"Due: {local_dt.strftime('%d %b, %Y at %I:%M %p')}"
                 if deadline_data.get('file_id'):
                     if file_type == "photo":
                         await context.bot.send_photo(u["id"], photo=deadline_data['file_id'], caption=msg, parse_mode="Markdown")
@@ -207,7 +227,7 @@ async def add_deadline_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
     except ValueError:
-        await update.message.reply_text("⚠️ Invalid time. Please use *HH:MM* (e.g., 23:59).\nOr type /cancel.")
+        await update.message.reply_text("⚠️ Invalid time format. Please use something like *11:59 PM* or *23:59*.\nOr type /cancel.")
         return DUE_TIME
 
 async def delete_deadline_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -244,6 +264,7 @@ deadline_add_handler = ConversationHandler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, add_deadline_title),
             MessageHandler(filters.PHOTO | filters.Document.ALL, add_deadline_title)
         ],
+        DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_deadline_desc)],
         TYPE: [CallbackQueryHandler(add_deadline_type, pattern="^(type_|cancel_action)")],
         DUE_DATE: [MessageHandler(filters.TEXT, add_deadline_date)],
         DUE_TIME: [MessageHandler(filters.TEXT, add_deadline_time)],

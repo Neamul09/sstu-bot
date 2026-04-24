@@ -11,7 +11,7 @@ from handlers.timetable import timetable_view_handler, timetable_nav_handler, ti
 from handlers.deadlines import deadline_view_handler, deadline_nav_handler, deadline_add_handler, deadline_delete_handler
 from handlers.notices import notice_view_handler, notice_nav_handler, notice_post_handler, notice_delete_handler, notice_search_handler
 from handlers.admin import teacher_class_handler
-from handlers.menu import menu_handler, handle_menu_click, lang_toggle_handler
+from handlers.menu import menu_handler, handle_menu_click, lang_toggle_handler, settings_view_handler, pref_toggle_handler, profile_back_handler
 from handlers.poll import poll_handler, poll_view_handler, poll_delete_handler
 from handlers.manage_class import manage_class_handler
 from handlers.resources import res_view_handler, res_nav_handler, res_click_handler, res_add_handler, res_delete_handler, res_search_handler
@@ -82,6 +82,9 @@ def start_bot():
     application.add_handler(res_nav_handler)
     application.add_handler(res_click_handler)
     application.add_handler(lang_toggle_handler)
+    application.add_handler(settings_view_handler)
+    application.add_handler(pref_toggle_handler)
+    application.add_handler(profile_back_handler)
     
     # Management Callbacks
     application.add_handler(notice_delete_handler)

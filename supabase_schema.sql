@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'STUDENT',
     department TEXT,
     semester INTEGER,
+    pref_class_reminders BOOLEAN DEFAULT TRUE,
+    pref_deadline_reminders BOOLEAN DEFAULT TRUE,
+    pref_daily_digest BOOLEAN DEFAULT TRUE,
+    pref_notices BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -36,6 +40,7 @@ CREATE TABLE IF NOT EXISTS deadlines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     class_id TEXT NOT NULL, -- Format: Dept_Sem
     title TEXT NOT NULL,
+    description TEXT,
     type TEXT NOT NULL, -- ASSIGNMENT, EXAM
     due_datetime TIMESTAMPTZ NOT NULL,
     file_id TEXT, -- Optional Telegram file UI for attachments
@@ -49,7 +54,9 @@ CREATE TABLE IF NOT EXISTS notices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     class_id TEXT NOT NULL, -- Format: Dept_Sem
     author_id BIGINT REFERENCES users(id),
-    content TEXT NOT NULL,
+    title TEXT,
+    description TEXT,
+    content TEXT NOT NULL, -- Kept for backwards compatibility
     file_id TEXT, -- Optional attachment
     category TEXT DEFAULT 'GENERAL', -- GENERAL, EMERGENCY, ACADEMIC
     created_at TIMESTAMPTZ DEFAULT NOW()

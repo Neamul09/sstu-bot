@@ -24,9 +24,11 @@ async def check_class_reminders(context: ContextTypes.DEFAULT_TYPE):
         class_id = slot["class_id"]
         # Find all users in this class (Dept_Sem)
         dept, sem = class_id.split("_")
-        users = supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).execute().data
+        users = supabase.table("users").select("id, pref_class_reminders").eq("department", dept).eq("semester", int(sem)).execute().data
         
         for user in users:
+            if not user.get("pref_class_reminders", True):
+                continue
             try:
                 await bot.send_message(
                     chat_id=user["id"],
@@ -67,9 +69,11 @@ async def check_deadline_reminders(context: ContextTypes.DEFAULT_TYPE):
 async def send_deadline_push(bot, deadline, time_left):
     class_id = deadline["class_id"]
     dept, sem = class_id.split("_")
-    users = supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).execute().data
+    users = supabase.table("users").select("id, pref_deadline_reminders").eq("department", dept).eq("semester", int(sem)).execute().data
     
     for user in users:
+        if not user.get("pref_deadline_reminders", True):
+            continue
         try:
             await bot.send_message(
                 chat_id=user["id"],
@@ -88,6 +92,9 @@ async def daily_digest(context: ContextTypes.DEFAULT_TYPE):
     all_users = supabase.table("users").select("*").execute().data
     
     for user in all_users:
+        if not user.get("pref_daily_digest", True):
+            continue
+            
         class_id = f"{user['department']}_{user['semester']}"
         
         # 1. Tomorrow's Timetable

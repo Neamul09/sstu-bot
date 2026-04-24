@@ -10,7 +10,7 @@ from telegram.error import BadRequest
 from utils.i18n import t
 
 # States
-CONTENT, SEARCH_QUERY = range(2)
+TITLE, DESC, SEARCH_QUERY = range(3)
 POSTS_PER_PAGE = 3
 
 async def view_notices(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,7 +54,13 @@ async def view_notices(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Since author is a user ID, we could fetch their name, but for board we can just show notice text
             text += f"📅 _{created.strftime('%d %b, %I:%M %p')}_\n"
-            text += f"   {n['content']}\n\n"
+            if n.get('title'):
+                text += f"   📌 *{n['title']}*\n"
+            
+            # Legacy notices used 'content', new notices use 'description'
+            display_text = n.get('description') or n.get('content', '')
+            text += f"   {display_text}\n\n"
+            
             if n.get('file_id'):
                 text += "📎 _(This notice contained an attachment. Find it in 📚 Resources or scroll up.)_\n\n"
             text += "━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -108,16 +114,28 @@ async def post_notice_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if query: await query.answer()
 
-    text = t("post_notice_prompt", lang)
+    text = "📝 *Post New Notice*\n\nPlease type the *Title* of the Notice:"
     
     if query:
         await query.edit_message_text(text, parse_mode="Markdown")
     else:
         await msg_obj.reply_text(text, parse_mode="Markdown")
         
-    return CONTENT
+    return TITLE
 
-async def post_notice_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def post_notice_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg_obj = update.message
+    if msg_obj.text and msg_obj.text.lower() == "/cancel":
+        await msg_obj.reply_text("❌ Action Cancelled.")
+        return ConversationHandler.END
+        
+    context.user_data["active_notice_title"] = msg_obj.text
+    
+    text = "Got it! Now please type the *Description/Content* or upload a File/Photo with a Caption:\n_(Or type /skip to leave description empty)_"
+    await msg_obj.reply_text(text, parse_mode="Markdown")
+    return DESC
+
+async def post_notice_desc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg_obj = update.message
     if msg_obj.text and msg_obj.text.lower() == "/cancel":
         await msg_obj.reply_text(t("action_cancelled", "en"))
@@ -157,13 +175,17 @@ async def post_notice_content(update: Update, context: ContextTypes.DEFAULT_TYPE
         file_type = "document"
         res_type = "FILE"
     else:
-        content = msg_obj.text
-        context.user_data["active_notice_content"] = content
+        desc = "" if msg_obj.text.lower() == "/skip" else msg_obj.text
+        context.user_data["active_notice_content"] = desc
+    
+    notice_title = context.user_data.get("active_notice_title", "Notice")
     
     notice_data = {
         "class_id": class_id,
         "author_id": user['id'],
-        "content": content,
+        "title": notice_title,
+        "description": desc,
+        "content": desc, # Legacy fallback
         "category": 'GENERAL',
         "file_id": file_id
     }
@@ -174,8 +196,8 @@ async def post_notice_content(update: Update, context: ContextTypes.DEFAULT_TYPE
         Database.add_resource({
             "class_id": class_id,
             "author_id": user['id'],
-            "title": content[:40] + ("..." if len(content)>40 else ""),
-            "description": content,
+            "title": notice_title,
+            "description": desc,
             "resource_type": res_type,
             "content": file_id
         })
@@ -186,9 +208,13 @@ async def post_notice_content(update: Update, context: ContextTypes.DEFAULT_TYPE
     class_users = supabase.table("users").select("id, language").eq("department", dept).eq("semester", int(sem)).neq("id", user.get('id')).execute().data
     
     for u in class_users:
+        if u.get('pref_notices', True) == False:
+            continue
+            
         u_lang = u.get("language", "en")
         try:
-            msg = t("notice_from", u_lang, author=user['full_name'], role=user['role']) + f"\n{content}"
+            msg = t("notice_from", u_lang, author=user['full_name'], role=user['role'])
+            msg += f"\n📌 *{notice_title}*\n{desc}"
             if file_id:
                 if file_type == "photo":
                     await context.bot.send_photo(u["id"], photo=file_id, caption=msg, parse_mode="Markdown")
@@ -213,6 +239,7 @@ async def finish_notice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     # Clear session cache
     context.user_data.pop("active_notice_content", None)
+    context.user_data.pop("active_notice_title", None)
     
     await query.answer("Broadcast Complete!")
     await query.edit_message_text("✅ All files have been broadcasted and saved to Resources.")
@@ -266,7 +293,9 @@ async def search_notice_perform(update: Update, context: ContextTypes.DEFAULT_TY
     text = t("search_results", lang, query=search_text)
     for n in results[:5]: # Top 5 results
         created = datetime.datetime.fromisoformat(n['created_at']).astimezone(pytz.timezone(Config.TZ))
-        text += f"📅 _{created.strftime('%d %b, %I:%M %p')}_\n   {n['content']}\n\n"
+        display_text = n.get('description') or n.get('content', '')
+        title_text = f"📌 *{n['title']}*\n   " if n.get('title') else ""
+        text += f"📅 _{created.strftime('%d %b, %I:%M %p')}_\n   {title_text}{display_text}\n\n"
         
     await update.message.reply_text(text, parse_mode="Markdown")
     return ConversationHandler.END
@@ -289,9 +318,10 @@ notice_post_handler = ConversationHandler(
         CallbackQueryHandler(post_notice_trigger, pattern="^post_notice_trigger$")
     ],
     states={
-        CONTENT: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, post_notice_content),
-            MessageHandler(filters.PHOTO | filters.Document.ALL, post_notice_content),
+        TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_notice_title)],
+        DESC: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, post_notice_desc),
+            MessageHandler(filters.PHOTO | filters.Document.ALL, post_notice_desc),
             CallbackQueryHandler(finish_notice, pattern="^finish_notice$")
         ]
     },

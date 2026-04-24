@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ConversationHandler
 from database import Database
-from utils.timezone import get_now, format_time, get_day_of_week
+from utils.timezone import get_now, format_time, get_day_of_week, parse_time
 from utils.helpers import build_menu, get_cancel_button
 from config import Config
 from telegram.error import BadRequest
@@ -55,19 +55,23 @@ async def view_timetable(update: Update, context: ContextTypes.DEFAULT_TYPE):
             overrides = Database.get_class_overrides(slot['id'], current_date_str)
             override = overrides[0] if overrides else None
 
+            start_formatted = datetime.datetime.strptime(slot['start_time'], "%H:%M:%S").strftime("%I:%M %p")
+            end_formatted = datetime.datetime.strptime(slot['end_time'], "%H:%M:%S").strftime("%I:%M %p")
+
             if is_cancelled:
                 text += f"❌ ~~*{slot['subject']}*~~ [CANCELLED]\n"
-                text += f"   🕒 {slot['start_time'][:5]} - {slot['end_time'][:5]}\n"
+                text += f"   🕒 {start_formatted} - {end_formatted}\n"
             elif override:
+                override_start = datetime.datetime.strptime(override['new_start_time'], "%H:%M:%S").strftime("%I:%M %p")
                 text += f"🕒 *{slot['subject']}* [RESCHEDULED]\n"
-                text += f"   🕒 *{override['new_start_time'][:5]}* (Originally {slot['start_time'][:5]})\n"
+                text += f"   🕒 *{override_start}* (Originally {start_formatted})\n"
                 if override.get('new_room'):
                     text += f"   📍 Room: {override['new_room']}\n"
                 else:
                     text += f"   📍 Room: {slot['room']}\n"
             else:
                 text += f"🔹 *{slot['subject']}*\n"
-                text += f"   🕒 {slot['start_time'][:5]} - {slot['end_time'][:5]}\n"
+                text += f"   🕒 {start_formatted} - {end_formatted}\n"
                 if slot['room']:
                     text += f"   📍 Room: {slot['room']}\n"
             
@@ -159,7 +163,7 @@ async def add_slot_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
     day_name = DAYS[day_idx]
     
     await query.edit_message_text(
-        text=f"Day: *{day_name}*\n\nPlease type the *Start Time* (HH:MM in 24h format, e.g., 09:30):",
+        text=f"Day: *{day_name}*\n\nPlease type the *Start Time* (e.g., 09:30 or 2:30 PM):",
         parse_mode="Markdown"
     )
     return START
@@ -170,17 +174,16 @@ async def add_slot_start_time(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ConversationHandler.END
         
     try:
-        # Validate time format
-        datetime.datetime.strptime(update.message.text, "%H:%M")
-        context.user_data["tmp_slot"]["start_time"] = update.message.text
+        parsed_time = parse_time(update.message.text)
+        context.user_data["tmp_slot"]["start_time"] = parsed_time
         
         await update.message.reply_text(
-            f"Start Time: *{update.message.text}*\n\nPlease type the *End Time* (HH:MM):",
+            f"Start Time: *{parsed_time}*\n\nPlease type the *End Time* (e.g., 14:00 or 4:00 PM):",
             parse_mode="Markdown"
         )
         return END
     except ValueError:
-        await update.message.reply_text("⚠️ Invalid time format. Please use *HH:MM* (e.g., 14:00).\nOr type /cancel.")
+        await update.message.reply_text("⚠️ Invalid time format. Please use something like *14:00* or *2:00 PM*.\nOr type /cancel.")
         return START
 
 async def add_slot_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -189,21 +192,21 @@ async def add_slot_end_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
         
     try:
-        datetime.datetime.strptime(update.message.text, "%H:%M")
-        context.user_data["tmp_slot"]["end_time"] = update.message.text
+        parsed_time = parse_time(update.message.text)
+        context.user_data["tmp_slot"]["end_time"] = parsed_time
         
         # Room selection can be None
         buttons = [InlineKeyboardButton("Skip / No Room", callback_data="skip_room")]
         reply_markup = build_menu(buttons, n_cols=1)
         
         await update.message.reply_text(
-            f"End Time: *{update.message.text}*\n\nPlease type the *Room Number/Name*:",
+            f"End Time: *{parsed_time}*\n\nPlease type the *Room Number/Name*:",
             reply_markup=reply_markup,
             parse_mode="Markdown"
         )
         return ROOM
     except ValueError:
-        await update.message.reply_text("⚠️ Invalid time format. Please use *HH:MM* (e.g., 15:30).\nOr type /cancel.")
+        await update.message.reply_text("⚠️ Invalid time format. Please use something like *15:30* or *3:30 PM*.\nOr type /cancel.")
         return END
 
 async def process_slot_saving(user_id, slot_data):
@@ -241,10 +244,12 @@ async def add_slot_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = Database.get_user(user_id)
     for u in class_users:
         try:
+            start_fmt = datetime.datetime.strptime(slot_data['start_time'], "%H:%M").strftime("%I:%M %p")
+            end_fmt = datetime.datetime.strptime(slot_data['end_time'], "%H:%M").strftime("%I:%M %p")
             msg = f"🔔 *New Class Added by {user['full_name']}*\n" \
                   f"Subject: *{slot_data['subject']}*\n" \
                   f"Day: {DAYS[slot_data['day_of_week']]}\n" \
-                  f"Time: {slot_data['start_time']} - {slot_data['end_time']}"
+                  f"Time: {start_fmt} - {end_fmt}"
             await context.bot.send_message(u["id"], msg, parse_mode="Markdown")
         except:
             pass
