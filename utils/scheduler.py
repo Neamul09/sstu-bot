@@ -2,8 +2,11 @@ from telegram.ext import ContextTypes
 from database import Database, supabase
 from utils.timezone import get_now
 import datetime
+import logging
 import pytz
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 async def check_class_reminders(context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
@@ -130,13 +133,54 @@ async def daily_digest(context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
+async def reset_weekly_overrides(context: ContextTypes.DEFAULT_TYPE):
+    """
+    Runs every Friday at 23:59 local time.
+    Clears all expired cancelled_classes and class_overrides rows so that
+    per-week exceptions do not carry over into the next week.
+    """
+    now = get_now()
+    today_str = now.strftime("%Y-%m-%d")
+    try:
+        # Delete cancellations on or before today
+        del_cancelled = supabase.table("cancelled_classes") \
+            .delete() \
+            .lte("cancel_date", today_str) \
+            .execute()
+        # Delete overrides on or before today
+        del_overrides = supabase.table("class_overrides") \
+            .delete() \
+            .lte("override_date", today_str) \
+            .execute()
+        logger.info(
+            "[Weekly Reset] Cleared expired overrides for week ending %s. "
+            "cancelled_classes deleted: %d, class_overrides deleted: %d",
+            today_str,
+            len(del_cancelled.data) if del_cancelled.data else 0,
+            len(del_overrides.data) if del_overrides.data else 0,
+        )
+    except Exception as e:
+        logger.error("[Weekly Reset] Failed to clear overrides: %s", e)
+
+
 def start_scheduler(application):
     job_queue = application.job_queue
     # PTB's JobQueue run_repeating takes interval in seconds
     job_queue.run_repeating(check_class_reminders, interval=60, first=10)
     job_queue.run_repeating(check_deadline_reminders, interval=300, first=10)
-    
-    # Run Daily Digest at 20:00 (8 PM) Local Time
+
     local_tz = pytz.timezone(Config.TZ)
+
+    # Run Daily Digest at 20:00 (8 PM) Local Time
     target_time = datetime.time(hour=20, minute=0, tzinfo=local_tz)
     job_queue.run_daily(daily_digest, time=target_time)
+
+    # Run Weekly Routine Reset every Friday at 23:59 local time
+    # weekday: 0=Mon … 4=Fri … 6=Sun  (PTB uses the same convention)
+    reset_time = datetime.time(hour=23, minute=59, tzinfo=local_tz)
+    job_queue.run_daily(
+        reset_weekly_overrides,
+        time=reset_time,
+        days=(4,),   # Friday only
+    )
+    logger.info("[Scheduler] Weekly routine reset job registered for Friday 23:59 %s", Config.TZ)

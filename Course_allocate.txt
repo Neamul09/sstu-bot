@@ -1,0 +1,113 @@
+First Year First Semester
+Course Code Course Title Credit
+0613 04 CSE 1101 Structured Programming Languages 3.0
+0613 04 CSE 1102 Structured Programming Languages Lab 1.5
+0533 04 PHY 1101 Physics 3.0
+0533 04 PHY 1102 Physics Lab 1.0
+0613 04 CSE 1103 Discrete Mathematics 3.0
+0531 04 CHEM 1101 Inorganic and Physical Chemistry 3.0
+0613 04 CSE 1104 ICT Business Entrepreneurship 2.0
+0541 04 MATH 1101 Coordinate Geometry and Linear Algebra 3.0
+Total Credits = 19.5
+
+
+First Year Second Semester
+Course Code Course Title Credit
+0613 04 CSE 1201 Object-Oriented Programming Languages 3.0
+0613 04 CSE 1202 Object-Oriented Programming Languages Lab 1.5
+0613 04 CSE 1203 Data Structures 3.0
+0613 04 CSE 1204 Data Structures Lab 1.5
+0713 04 EEE 1201 Introduction to Electrical Circuits 3.0
+0713 04 EEE 1202 Introduction to Electrical Circuits Lab 1.0
+0413 04 ECO 1201 Engineering Economics 2.0
+0413 04 ACT 1203 Financial and Managerial Accounting 2.0
+0541 04 MATH 1201 Differential and Integral Calculus 3.0
+Total Credits = 20
+
+
+Second Year First Semester
+Course Code Course Title Credit
+0613 04 CSE 2101 Advanced Concepts of Programming Languages 3.0
+0613 04 CSE 2102 Advanced Concepts of Programming Languages Lab 1.5
+0613 04 CSE 2103 Algorithm Design and Analysis 3.0
+0613 04 CSE 2104 Algorithm Design and Analysis Lab 1.5
+0713 04 EEE 2101 Electronic Devices and Circuit 3.0
+0713 04 EEE 2102 Electronic Devices and Circuit Lab 1.0
+0231 04 ENG 2101 Communicative English 3.0
+0211 04 CSE 2101 Engineering drawing Lab 1.0
+0541 04 MATH 2101 Vector Analysis, Complex Variables, Laplace Transform and Fourier Series 3.0
+Total Credits = 20
+
+
+
+Second Year Second Semester
+Course Code Course Title Credit
+0613 04 CSE 2201 Graph Theory and Additive Combinatorics 3.0
+0613 04 CSE 2202 Graph Theory and Additive Combinatorics Lab 1.0
+0612 04 CSE 2201 Database Management System 3.0
+0612 04 CSE 2202 Database Management System Lab 1.5
+0612 04 CSE 2203 System Analysis and Design 3.0
+0713 04 CSE 2201 Digital Logic Design 3.0
+0713 04 CSE 2202 Digital Logic Design Lab 1.0
+0541 04 MATH 2201 Statistical Methods and Probability 3.0
+0688 04 CSE 2200 Software Application Development Project 1.0
+Total Credits=19.5
+
+
+
+Third Year First Semester
+Course Code Course Title Credit
+0613 04 CSE 3101 Computer Graphics and Multimedia 3.0
+0613 04 CSE 3102 Computer Graphics and Multimedia Lab 1.0
+0612 04 CSE 3101 Theory of Computation and Complier Design 3.0
+0612 04 CSE 3102 Theory of Computation and Complier Design Lab 1.0
+0612 04 CSE 3103 Data and Telecommunication 3.0
+0613 04 CSE 3103 Computer Architecture 3.0
+0613 04 CSE 3105 Software Engineering and Design Pattern 3.0
+0613 04 CSE 3106 Software Engineering and Design Pattern Lab 1.0
+0613 04 CSE 3104 Web Engineering Lab 1.5
+Total Credits = 19.5
+
+
+
+Third Year Second Semester
+Course Code Course Title Credit
+0613 04 CSE 3201 Artificial Intelligence 3.0
+0613 04 CSE 3202 Artificial Intelligence Lab 1.5
+0613 04 CSE 3203 Operating System 3.0
+0613 04 CSE 3204 Operating System Lab 1.5
+0612 04 CSE 3201 Computer Networking 3.0
+0612 04 CSE 3202 Computer Networking Lab 1.5
+0612 04 CSE 3203 Digital Signal and Image Processing 3.0
+0612 04 CSE 3204 Digital Signal and Image Processing Lab 1.5
+0688 04 CSE 3200 Industrial Attachment on Software/Hardware Development Project 1.0
+Total Credits = 19
+
+
+
+
+Fourth Year First Semester
+Course Code Course Title Credit
+0613 04 CSE 4101 Machine Learning 3.0
+0613 04 CSE 4102 Machine Learning Lab 1.5
+0612 04 CSE 4101 Microprocessor and Microcontroller 3.0
+0612 04 CSE 4102 Microprocessor and Microcontroller Lab 1.5
+0613 04 CSE 4104 Mobile Application Development Lab 1.5
+0541 04 MATH 4101 Numerical Analysis 2.0
+0613 04 CSE 4103 Project management and Software Quality Assurance 3.0
+0231 04 ENG 4101 Technical Writing and Presentation 2.0
+0688 04 CSE 4100-A Capstone Project Design 2.0
+Total Credits = 19.5
+
+
+
+Fourth Year Second Semester
+Course Code Course Title Credit
+0541/0413/0612/0613/0619/0714-4** Elective Course I 3.0
+0541/0413/0612/0613/0619/0714-4** Elective Course I Lab 1.5
+0541/0413/0612/0613/0619/0714-4** Elective Course II 3.0
+0541/0413/0612/0613/0619/0714-4** Elective Course II Lab 1.5
+0223 04 CSE 4201 Engineering Ethics and Cyber Law 2.0
+0612 04 CSE 4201 Cryptography and Network Security 3.0
+0688 04 CSE 4100-B Capstone Project Design 4.0
+Total Credits = 18

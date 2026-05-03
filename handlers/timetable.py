@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQ
 from database import Database
 from utils.timezone import get_now, format_time, get_day_of_week, parse_time
 from utils.helpers import build_menu, get_cancel_button
+from utils.course_loader import get_courses
 from config import Config
 from telegram.error import BadRequest
 from utils.i18n import t
@@ -11,7 +12,7 @@ import datetime
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 # States for Adding Timetable
-SUBJ, DAY, START, END, ROOM = range(5)
+SUBJ_CHOICE, SUBJ, DAY, START, END, ROOM = range(6)
 
 
 async def view_timetable(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -127,14 +128,82 @@ async def add_slot_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else: await update.message.reply_text(msg)
         return ConversationHandler.END
 
-    text = "📝 *Add New Class Slot*\n\nPlease type the *Subject Name* (e.g., Data Structures):"
-    
-    if query:
-        await query.edit_message_text(text, parse_mode="Markdown")
+    semester = user.get("semester", 0)
+    courses = get_courses(semester)
+
+    if courses:
+        # Build course picker buttons (2 per row)
+        course_buttons = [
+            InlineKeyboardButton(c[:30], callback_data=f"course_{i}")
+            for i, c in enumerate(courses)
+        ]
+        footer = [
+            InlineKeyboardButton("✏️ Enter Manually", callback_data="course_manual"),
+            InlineKeyboardButton("❌ Cancel", callback_data="cancel_action"),
+        ]
+        reply_markup = build_menu(course_buttons, n_cols=2, footer_buttons=footer)
+        text = (
+            f"📚 *Add New Class Slot*\n"
+            f"_Semester {semester} courses — tap to select or enter manually:_"
+        )
     else:
-        await update.message.reply_text(text, parse_mode="Markdown")
-        
-    return SUBJ
+        # No courses found for this semester — fall back to manual directly
+        footer = [InlineKeyboardButton("❌ Cancel", callback_data="cancel_action")]
+        reply_markup = build_menu(footer, n_cols=1)
+        text = "📝 *Add New Class Slot*\n\nPlease type the *Subject Name* (e.g., Data Structures):"
+
+    if query:
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+
+    # If no courses, go straight to manual text entry
+    return SUBJ_CHOICE if courses else SUBJ
+
+
+async def add_slot_subj_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the course picker selection or the manual input choice."""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "cancel_action":
+        await query.edit_message_text("❌ Action Cancelled.")
+        return ConversationHandler.END
+
+    if query.data == "course_manual":
+        # User wants to type the subject manually
+        await query.edit_message_text(
+            "📝 Please type the *Subject Name* (e.g., Data Structures):",
+            parse_mode="Markdown"
+        )
+        return SUBJ  # Go to existing text-based step
+
+    # Otherwise it's a course selection: "course_<index>"
+    user_id = query.from_user.id
+    user = Database.get_user(user_id)
+    semester = user.get("semester", 0)
+    courses = get_courses(semester)
+
+    try:
+        idx = int(query.data.split("_")[1])
+        chosen = courses[idx]
+    except (ValueError, IndexError):
+        await query.edit_message_text("⚠️ Invalid selection. Please try again.")
+        return ConversationHandler.END
+
+    context.user_data["tmp_slot"] = {"subject": chosen}
+
+    # Go straight to day selection
+    buttons = [InlineKeyboardButton(day[:3], callback_data=f"addday_{i}") for i, day in enumerate(DAYS)]
+    reply_markup = build_menu(buttons, n_cols=4, footer_buttons=get_cancel_button())
+
+    await query.edit_message_text(
+        f"Subject: *{chosen}*\n\nSelect the day of the week:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+    return DAY
+
 
 async def add_slot_subj(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["tmp_slot"] = {"subject": update.message.text}
@@ -364,6 +433,12 @@ timetable_add_handler = ConversationHandler(
         CallbackQueryHandler(add_slot_trigger, pattern="^add_slot_trigger$")
     ],
     states={
+        SUBJ_CHOICE: [
+            CallbackQueryHandler(
+                add_slot_subj_choice,
+                pattern="^(course_\\d+|course_manual|cancel_action)$"
+            )
+        ],
         SUBJ: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_slot_subj)],
         DAY: [CallbackQueryHandler(add_slot_day, pattern="^(addday_|cancel_action)")],
         START: [MessageHandler(filters.TEXT, add_slot_start_time)],
@@ -375,3 +450,4 @@ timetable_add_handler = ConversationHandler(
     },
     fallbacks=[CommandHandler("cancel", cancel_global)]
 )
+
