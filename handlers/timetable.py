@@ -377,8 +377,6 @@ async def upload_routine_trigger(update: Update, context: ContextTypes.DEFAULT_T
     await query.edit_message_text(t("ask_routine_img", lang), parse_mode="Markdown")
     return UPLOAD_IMG
 
-    return UPLOAD_IMG
-
 async def handle_routine_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.photo:
         await update.message.reply_text("⚠️ Please send a *Photo* of the routine.")
@@ -535,4 +533,3 @@ timetable_add_handler = ConversationHandler(
     },
     fallbacks=[CommandHandler("cancel", cancel_global)]
 )
-
