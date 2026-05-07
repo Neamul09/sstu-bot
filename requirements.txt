@@ -1,0 +1,7 @@
+python-telegram-bot
+supabase
+python-dotenv
+pytz
+apscheduler
+postgrest
+Flask
