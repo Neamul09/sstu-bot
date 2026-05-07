@@ -124,6 +124,16 @@ CREATE TABLE IF NOT EXISTS poll_votes (
     UNIQUE(poll_id, user_id)
 );
 
+-- 12. Create Scheduled Notifications Table (Batching)
+CREATE TABLE IF NOT EXISTS scheduled_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id TEXT NOT NULL,
+    target_date DATE NOT NULL,
+    scheduled_time TIMESTAMPTZ NOT NULL,
+    status TEXT DEFAULT 'PENDING',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indices for performance
 CREATE INDEX IF NOT EXISTS idx_users_dept_sem ON users(department, semester);
 CREATE INDEX IF NOT EXISTS idx_timetable_class ON timetable(class_id);
@@ -131,3 +141,4 @@ CREATE INDEX IF NOT EXISTS idx_deadlines_class ON deadlines(class_id);
 CREATE INDEX IF NOT EXISTS idx_notices_class ON notices(class_id);
 CREATE INDEX IF NOT EXISTS idx_resources_class ON resources(class_id);
 CREATE INDEX IF NOT EXISTS idx_polls_class ON polls(class_id);
+CREATE INDEX IF NOT EXISTS idx_sched_notif ON scheduled_notifications(status, scheduled_time);

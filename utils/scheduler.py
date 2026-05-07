@@ -162,12 +162,43 @@ async def reset_weekly_overrides(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error("[Weekly Reset] Failed to clear overrides: %s", e)
 
+async def dispatch_scheduled_notifications(context: ContextTypes.DEFAULT_TYPE):
+    bot = context.bot
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now_iso = now.isoformat()
+    
+    # Get all pending notifications where scheduled_time <= now
+    pending = Database.get_pending_notifications(now_iso)
+    
+    if not pending:
+        return
+        
+    from handlers.timetable import get_routine_text
+    
+    for notif in pending:
+        class_id = notif["class_id"]
+        dept, sem = class_id.split("_")
+        target_date = notif["target_date"]
+        
+        routine_text = get_routine_text(class_id, dept, int(sem), target_date, "STUDENT")
+        msg = f"📢 *CLASS ROUTINE UPDATE (Scheduled)*\n\n{routine_text}"
+        
+        users = supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).execute().data
+        for user in users:
+            try:
+                await bot.send_message(chat_id=user["id"], text=msg, parse_mode="Markdown")
+            except Exception:
+                pass
+                
+        # Mark as sent
+        Database.mark_notification_sent(notif["id"])
 
 def start_scheduler(application):
     job_queue = application.job_queue
     # PTB's JobQueue run_repeating takes interval in seconds
     job_queue.run_repeating(check_class_reminders, interval=60, first=10)
     job_queue.run_repeating(check_deadline_reminders, interval=300, first=10)
+    job_queue.run_repeating(dispatch_scheduled_notifications, interval=60, first=15)
 
     local_tz = pytz.timezone(Config.TZ)
 

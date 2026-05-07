@@ -75,14 +75,13 @@ async def handle_cancellation_callback(update: Update, context: ContextTypes.DEF
     slot = res.data[0]
     dept, sem = slot['class_id'].split("_")
     
-    alert_msg = f"🚨 *CLASS CANCELLED* 🚨\n\nSubject: *{slot['subject']}*\nTime: {slot['start_time'][:5]}\nDate: {current_date}\n\n_Alerted by your representative._"
-    
-    class_users = Database.supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).neq("id", user["id"]).execute().data
-    for u in class_users:
-        try: await context.bot.send_message(u["id"], alert_msg, parse_mode="Markdown")
-        except: pass
+    keyboard = [
+        [InlineKeyboardButton("📤 Send Instant Alert", callback_data=f"ntfy_inst_{current_date}")],
+        [InlineKeyboardButton("🕒 Schedule Notification", callback_data=f"ntfy_sch_{current_date}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
             
-    await query.edit_message_text(f"✅ Class *{slot['subject']}* cancelled and students alerted.", parse_mode="Markdown")
+    await query.edit_message_text(f"✅ Class *{slot['subject']}* cancelled.\n\nWould you like to notify the class about the updated routine for {current_date}?", parse_mode="Markdown", reply_markup=reply_markup)
     return ConversationHandler.END
 
 async def start_rescheduling(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -122,14 +121,13 @@ async def finish_rescheduling(update: Update, context: ContextTypes.DEFAULT_TYPE
     slot = res.data[0]
     dept, sem = slot['class_id'].split("_")
     
-    alert_msg = f"🕒 *CLASS RESCHEDULED* 🕒\n\nSubject: *{slot['subject']}*\n*NEW Time*: {new_time}\n*NEW Room*: {new_room or 'N/A'}\nDate: {current_date}"
-    
-    class_users = Database.supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).neq("id", user["id"]).execute().data
-    for u in class_users:
-        try: await context.bot.send_message(u["id"], alert_msg, parse_mode="Markdown")
-        except: pass
+    keyboard = [
+        [InlineKeyboardButton("📤 Send Instant Alert", callback_data=f"ntfy_inst_{current_date}")],
+        [InlineKeyboardButton("🕒 Schedule Notification", callback_data=f"ntfy_sch_{current_date}")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text("✅ Class rescheduled and students alerted!")
+    await update.message.reply_text(f"✅ Class rescheduled.\n\nWould you like to notify the class about the updated routine for {current_date}?", reply_markup=reply_markup)
     return ConversationHandler.END
 
 async def cancel_mng(update: Update, context: ContextTypes.DEFAULT_TYPE):

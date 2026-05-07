@@ -128,3 +128,16 @@ class Database:
     @staticmethod
     def search_resources(class_id: str, query: str):
         return supabase.table("resources").select("*").eq("class_id", class_id).or_(f"title.ilike.%{query}%,description.ilike.%{query}%").order("created_at", desc=True).execute().data
+
+    # --- Scheduled Notifications ---
+    @staticmethod
+    def add_scheduled_notification(notif_data: dict):
+        return supabase.table("scheduled_notifications").insert(notif_data).execute()
+
+    @staticmethod
+    def get_pending_notifications(before_time_iso: str):
+        return supabase.table("scheduled_notifications").select("*").eq("status", "PENDING").lte("scheduled_time", before_time_iso).execute().data
+
+    @staticmethod
+    def mark_notification_sent(notif_id: str):
+        return supabase.table("scheduled_notifications").update({"status": "SENT"}).eq("id", notif_id).execute()

@@ -12,6 +12,33 @@ def format_time(dt):
 def get_day_of_week():
     return get_now().weekday()
 
+def get_date_for_day_of_week(target_day_idx: int) -> str:
+    """
+    Returns the YYYY-MM-DD date string for a given day of the week 
+    in the current week (Monday-based).
+    """
+    from datetime import timedelta
+    now = get_now()
+    current_day_idx = now.weekday()
+    diff = target_day_idx - current_day_idx
+    target_date = now + timedelta(days=diff)
+    return target_date.strftime("%Y-%m-%d")
+
+def format_date_with_ordinal(date_str: str) -> str:
+    """
+    Converts YYYY-MM-DD to '11th May, 2026 - Monday' format.
+    """
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    day = dt.day
+    
+    if 11 <= (day % 100) <= 13:
+        suffix = 'th'
+    else:
+        suffix = ['th', 'st', 'nd', 'rd', 'th'][min(day % 10, 4)]
+        
+    return f"{day}{suffix} {dt.strftime('%B, %Y - %A')}"
+
+
 def parse_time(time_str: str) -> str:
     """
     Parses a time string in various AM/PM or 24h formats and returns a valid HH:MM (24h) string.

@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 from config import Config
 from handlers.onboarding import onboarding_handler
-from handlers.timetable import timetable_view_handler, timetable_nav_handler, timetable_add_handler, routine_view_handler, routine_upload_handler, slot_delete_handler
+from handlers.timetable import timetable_view_handler, timetable_nav_handler, timetable_add_handler, routine_view_handler, routine_upload_handler, slot_delete_handler, notify_instant_handler, notify_sched_handler
 from handlers.deadlines import deadline_view_handler, deadline_nav_handler, deadline_add_handler, deadline_delete_handler
 from handlers.notices import notice_view_handler, notice_nav_handler, notice_post_handler, notice_delete_handler, notice_search_handler
 from handlers.admin import teacher_class_handler
@@ -64,6 +64,7 @@ def start_bot():
     application.add_handler(notice_search_handler)
     application.add_handler(routine_upload_handler)
     application.add_handler(manage_class_handler)
+    application.add_handler(notify_sched_handler)
     
     # Command Handlers
     application.add_handler(timetable_view_handler)
@@ -93,6 +94,7 @@ def start_bot():
     application.add_handler(slot_delete_handler)
     application.add_handler(poll_delete_handler)
     application.add_handler(routine_view_handler)
+    application.add_handler(notify_instant_handler)
 
     # Persistent Menu clicks
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_click))
