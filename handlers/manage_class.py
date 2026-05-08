@@ -76,8 +76,9 @@ async def handle_cancellation_callback(update: Update, context: ContextTypes.DEF
     dept, sem = slot['class_id'].split("_")
     
     keyboard = [
-        [InlineKeyboardButton("📤 Send Instant Alert", callback_data=f"ntfy_inst_{current_date}")],
-        [InlineKeyboardButton("🕒 Schedule Notification", callback_data=f"ntfy_sch_{current_date}")]
+        [InlineKeyboardButton("📤 Send Notification Now", callback_data=f"ntfy_inst_{current_date}")],
+        [InlineKeyboardButton("🕒 Schedule Notification", callback_data=f"ntfy_sch_{current_date}")],
+        [InlineKeyboardButton("❌ Don't Send", callback_data="cancel_mng")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
             
@@ -122,8 +123,9 @@ async def finish_rescheduling(update: Update, context: ContextTypes.DEFAULT_TYPE
     dept, sem = slot['class_id'].split("_")
     
     keyboard = [
-        [InlineKeyboardButton("📤 Send Instant Alert", callback_data=f"ntfy_inst_{current_date}")],
-        [InlineKeyboardButton("🕒 Schedule Notification", callback_data=f"ntfy_sch_{current_date}")]
+        [InlineKeyboardButton("📤 Send Notification Now", callback_data=f"ntfy_inst_{current_date}")],
+        [InlineKeyboardButton("🕒 Schedule Notification", callback_data=f"ntfy_sch_{current_date}")],
+        [InlineKeyboardButton("❌ Don't Send", callback_data="cancel_mng")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 

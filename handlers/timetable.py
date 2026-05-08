@@ -15,6 +15,9 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 # States for Adding Timetable
 SUBJ_CHOICE, SUBJ, DAY, START, END, ROOM = range(6)
 
+# States for Scheduling Notification
+SCH_DATE, SCH_TIME = range(20, 22)
+
 
 def get_routine_text(class_id: str, dept: str, sem: int, target_date: str, user_role: str) -> str:
     target_dt = datetime.datetime.strptime(target_date, "%Y-%m-%d")
@@ -312,6 +315,7 @@ async def add_slot_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Notification Prompt
     target_date = get_date_for_day_of_week(slot_data['day_of_week'])
     keyboard = [
+        [InlineKeyboardButton("➕ Add More Classes", callback_data="add_slot_trigger")],
         [InlineKeyboardButton("📤 Send Instant Alert", callback_data=f"ntfy_inst_{target_date}")],
         [InlineKeyboardButton("🕒 Schedule Notification", callback_data=f"ntfy_sch_{target_date}")]
     ]
@@ -442,50 +446,132 @@ async def notify_sched_trigger(update: Update, context: ContextTypes.DEFAULT_TYP
     target_date = query.data.split("_")[2]
     context.user_data["notify_target_date"] = target_date
     
+    # Quick scheduling offsets
+    offsets = [5, 10, 20, 30, 60]
+    keyboard = []
+    offset_row = [InlineKeyboardButton(f"{o}m", callback_data=f"sch_off_{o}") for o in offsets]
+    keyboard.append(offset_row)
+    keyboard.append([InlineKeyboardButton("🗓️ Manual Date & Time", callback_data="sch_manual")])
+    keyboard.append([InlineKeyboardButton("✏️ Manual Time (For Class Date)", callback_data="sch_time_only")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await query.edit_message_text(
         f"🕒 *Schedule Notification for {target_date}*\n\n"
-        "Please enter the time to send the notification (Format: HH:MM or HH:MM PM, e.g. 20:30 or 8:30 PM):",
+        "Choose a quick delay (from now) or enter manually:",
+        reply_markup=reply_markup,
         parse_mode="Markdown"
     )
-    return NOTIFY_SCHED_TIME
+    return ConversationHandler.END # We use a separate handler for these callbacks
 
-async def notify_sched_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text.lower() == "/cancel":
+async def notify_sched_offset_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    offset_mins = int(query.data.split("_")[2])
+    target_date = context.user_data.get("notify_target_date")
+    user = Database.get_user(query.from_user.id)
+    class_id = f"{user['department']}_{user['semester']}"
+    
+    # Use present day for offsets as requested
+    now = get_now()
+    sched_dt = now + datetime.timedelta(minutes=offset_mins)
+    
+    import pytz
+    utc_sched_time = sched_dt.astimezone(pytz.UTC).isoformat()
+    
+    Database.add_scheduled_notification({
+        "class_id": class_id,
+        "target_date": target_date,
+        "scheduled_time": utc_sched_time,
+        "status": "PENDING"
+    })
+    
+    await query.edit_message_text(f"✅ Notification scheduled successfully for {sched_dt.strftime('%d %b %Y, %I:%M %p')}!")
+    return ConversationHandler.END
+
+async def notify_sched_manual_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    await query.edit_message_text(
+        "📝 Please enter the *Date* for the notification (Format: YYYY-MM-DD or 'today'):",
+        parse_mode="Markdown"
+    )
+    return SCH_DATE
+
+async def notify_sched_time_only_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    # Use the class's scheduled date
+    context.user_data["notify_manual_date"] = context.user_data.get("notify_target_date")
+    
+    await query.edit_message_text(
+        f"🕒 Please enter the *Time* (Format: HH:MM, e.g. 20:30 or 8:30 PM):",
+        parse_mode="Markdown"
+    )
+    return SCH_TIME
+
+async def notify_sched_get_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    date_text = update.message.text.lower()
+    if date_text == "/cancel":
+        await update.message.reply_text("❌ Action Cancelled.")
+        return ConversationHandler.END
+        
+    if date_text == "today":
+        target_date = get_now().strftime("%Y-%m-%d")
+    else:
+        try:
+            datetime.datetime.strptime(date_text, "%Y-%m-%d")
+            target_date = date_text
+        except ValueError:
+            await update.message.reply_text("⚠️ Invalid date format. Use YYYY-MM-DD or 'today'.")
+            return SCH_DATE
+            
+    context.user_data["notify_manual_date"] = target_date
+    await update.message.reply_text(f"Date: *{target_date}*\nNow please enter the *Time* (e.g. 14:00 or 2:00 PM):", parse_mode="Markdown")
+    return SCH_TIME
+
+async def notify_sched_get_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    time_text = update.message.text
+    if time_text.lower() == "/cancel":
         await update.message.reply_text("❌ Action Cancelled.")
         return ConversationHandler.END
         
     try:
-        parsed_time = parse_time(update.message.text)
+        parsed_time = parse_time(time_text)
+        manual_date = context.user_data.get("notify_manual_date")
+        target_routine_date = context.user_data.get("notify_target_date")
         
         user = Database.get_user(update.effective_user.id)
         class_id = f"{user['department']}_{user['semester']}"
-        target_date = context.user_data["notify_target_date"]
         
-        # Create a datetime for today with the parsed time
-        now = get_now()
-        hour, minute = map(int, parsed_time.split(':'))
-        sched_dt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        # Combine date and time
+        dt_str = f"{manual_date} {parsed_time}"
+        sched_dt = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
         
-        # If the scheduled time is in the past for today, assume they mean tomorrow
-        if sched_dt < now:
-            sched_dt += datetime.timedelta(days=1)
-            
+        # Adjust for local timezone
+        from config import Config
+        local_tz = pytz.timezone(Config.TZ)
+        sched_dt = local_tz.localize(sched_dt)
+        
         import pytz
         utc_sched_time = sched_dt.astimezone(pytz.UTC).isoformat()
         
         Database.add_scheduled_notification({
             "class_id": class_id,
-            "target_date": target_date,
+            "target_date": target_routine_date, # The notification is ABOUT this routine date
             "scheduled_time": utc_sched_time,
             "status": "PENDING"
         })
         
-        await update.message.reply_text(f"✅ Notification scheduled successfully for {sched_dt.strftime('%d %b %Y, %I:%M %p')}!")
+        await update.message.reply_text(f"✅ Notification scheduled for {sched_dt.strftime('%d %b %Y, %I:%M %p')}!")
         return ConversationHandler.END
         
     except ValueError:
-        await update.message.reply_text("⚠️ Invalid time format. Please use something like *20:30* or *8:30 PM*.\nOr type /cancel.", parse_mode="Markdown")
-        return NOTIFY_SCHED_TIME
+        await update.message.reply_text("⚠️ Invalid time format. Please use something like *20:30* or *8:30 PM*.")
+        return SCH_TIME
 
 # exports ...
 timetable_view_handler = CommandHandler("timetable", view_timetable)
@@ -495,9 +581,15 @@ slot_delete_handler = CallbackQueryHandler(delete_slot_callback, pattern="^delsl
 notify_instant_handler = CallbackQueryHandler(notify_instant_callback, pattern="^ntfy_inst_")
 
 notify_sched_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(notify_sched_trigger, pattern="^ntfy_sch_")],
+    entry_points=[
+        CallbackQueryHandler(notify_sched_trigger, pattern="^ntfy_sch_"),
+        CallbackQueryHandler(notify_sched_offset_callback, pattern="^sch_off_"),
+        CallbackQueryHandler(notify_sched_manual_trigger, pattern="^sch_manual$"),
+        CallbackQueryHandler(notify_sched_time_only_trigger, pattern="^sch_time_only$")
+    ],
     states={
-        NOTIFY_SCHED_TIME: [MessageHandler(filters.TEXT, notify_sched_save)]
+        SCH_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, notify_sched_get_date)],
+        SCH_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, notify_sched_get_time)]
     },
     fallbacks=[CommandHandler("cancel", cancel_global)]
 )
