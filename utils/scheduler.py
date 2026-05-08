@@ -180,7 +180,7 @@ async def dispatch_scheduled_notifications(context: ContextTypes.DEFAULT_TYPE):
         dept, sem = class_id.split("_")
         target_date = notif["target_date"]
         
-        routine_text = get_routine_text(class_id, dept, int(sem), target_date, "STUDENT")
+        routine_text, _ = get_routine_text(class_id, dept, int(sem), target_date, "STUDENT")
         msg = f"📢 *CLASS ROUTINE UPDATE (Scheduled)*\n\n{routine_text}"
         
         users = supabase.table("users").select("id").eq("department", dept).eq("semester", int(sem)).execute().data
