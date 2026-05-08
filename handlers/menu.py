@@ -17,7 +17,7 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [t("menu_timetable", lang), t("menu_resources", lang)],
         [t("menu_deadlines", lang), t("menu_notices", lang)],
-        [t("menu_profile", lang)]
+        [t("menu_results", lang), t("menu_profile", lang)]
     ]
     
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -65,6 +65,7 @@ async def handle_menu_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from handlers.deadlines import view_deadlines
     from handlers.notices import view_notices
     from handlers.resources import view_resources
+    from handlers.results import view_results
     from handlers.router import heuristic_router
     
     # Check against both languages for better resilience
@@ -76,6 +77,8 @@ async def handle_menu_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await view_deadlines(update, context)
     elif text in [t("menu_notices", "en"), t("menu_notices", "bn")]:
         await view_notices(update, context)
+    elif text in [t("menu_results", "en"), t("menu_results", "bn")]:
+        await view_results(update, context)
     elif text in [t("menu_profile", "en"), t("menu_profile", "bn")]:
         await send_profile(update, context, update.effective_user.id)
     else:

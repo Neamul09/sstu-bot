@@ -142,3 +142,15 @@ CREATE INDEX IF NOT EXISTS idx_notices_class ON notices(class_id);
 CREATE INDEX IF NOT EXISTS idx_resources_class ON resources(class_id);
 CREATE INDEX IF NOT EXISTS idx_polls_class ON polls(class_id);
 CREATE INDEX IF NOT EXISTS idx_sched_notif ON scheduled_notifications(status, scheduled_time);
+
+-- 13. Create Results Table
+CREATE TABLE IF NOT EXISTS results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    class_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    title TEXT NOT NULL, -- e.g. "CT-1", "Assignment 1"
+    marks TEXT, -- e.g. "18/20"
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_results_user ON results(user_id);

@@ -1,14 +1,19 @@
 """
 course_loader.py
-Parses Course_allocate.txt and returns a dict mapping semester number (1-8)
+Parses course allocation files and returns a dict mapping semester number (1-8)
 to a list of course titles for that semester.
 """
 
 import os
 import re
 
-# Path to the course allocation file (project root, relative to this utils/ dir)
-_COURSE_FILE = os.path.join(os.path.dirname(__file__), "..", "Course_allocate.txt")
+# Maps department to its respective filename
+_DEPT_FILES = {
+    "CSE": "CSE_Course_allocate.txt",
+    "Physics": "Physics_Course_allocate.txt",
+    "Chemistry": "Chemistry_Course_allocate.txt",
+    "Math": "Math_Course_allocate.txt"
+}
 
 # Maps ordinal words to integers
 _ORDINAL = {
@@ -16,17 +21,17 @@ _ORDINAL = {
 }
 
 # Header pattern: captures the year-ordinal and semester-ordinal as named groups
-# e.g. "Second Year First Semester"  =>  year="Second", sem="First"
 _HEADER_PATTERN = re.compile(
     r"(?P<year>First|Second|Third|Fourth)\s+Year\s+(?P<sem>First|Second)\s+Semester",
     re.IGNORECASE,
 )
 
 # Course line pattern:
-# e.g.  "0613 04 CSE 1101 Structured Programming Languages 3.0"
-#        ^--------code-------^  ^---------title-----------^ ^credit^
+# CSE Style: "0613 04 CSE 1101 Structured Programming Languages 3.0"
+# Physics/Chem Style: "PHY 0533 1121 Mechanics and Properties of Matter 3.0"
 _COURSE_PATTERN = re.compile(
-    r"^\s*\d{4}\s+\d{2}\s+\w+\s+[\w\-]+\s+(.+?)\s+\d+\.\d+\s*$"
+    r"^\s*(?:[A-Z]{3,4}\s+\d{4}\s+\d{4,5}|\d{4,5}\s+\d{2}\s+[A-Z]{3,4}\s+[\w\-]+)\s+(.+?)\s+\d+\.\d+\s*$",
+    re.IGNORECASE
 )
 
 
@@ -40,20 +45,31 @@ def _header_to_semester(match: re.Match) -> int:
     return (year_num - 1) * 2 + sem_num
 
 
-def load_courses() -> dict:
+def load_courses(dept: str) -> dict:
     """
-    Reads Course_allocate.txt and returns a dict:
+    Reads the appropriate allocation file and returns a dict:
         { semester_number: [course_title, ...], ... }
-    for semesters 1-8.
     """
+    filename = _DEPT_FILES.get(dept, "Course_allocate.txt")
+    file_path = os.path.join(os.path.dirname(__file__), "..", filename)
+    
     courses: dict = {}
     current_sem = None
 
     try:
-        with open(_COURSE_FILE, "r", encoding="utf-8-sig") as f:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
             lines = f.readlines()
     except FileNotFoundError:
-        return courses
+        # Fallback to default if dept-specific file not found
+        if filename != "Course_allocate.txt":
+            default_path = os.path.join(os.path.dirname(__file__), "..", "Course_allocate.txt")
+            try:
+                with open(default_path, "r", encoding="utf-8-sig") as f:
+                    lines = f.readlines()
+            except FileNotFoundError:
+                return courses
+        else:
+            return courses
 
     for raw_line in lines:
         line = raw_line.strip()
@@ -87,16 +103,16 @@ def load_courses() -> dict:
     return courses
 
 
-# Module-level cache so the file is read only once per process
-_COURSES_CACHE: dict | None = None
+# Module-level cache so files are read only once per process
+_COURSES_CACHE: dict = {}
 
 
-def get_courses(semester: int) -> list:
+def get_courses(semester: int, dept: str = "CSE") -> list:
     """
-    Returns the list of course titles for the given semester (1-8).
-    Cached after first call.
+    Returns the list of course titles for the given semester (1-8) and department.
     """
     global _COURSES_CACHE
-    if _COURSES_CACHE is None:
-        _COURSES_CACHE = load_courses()
-    return _COURSES_CACHE.get(semester, [])
+    if dept not in _COURSES_CACHE:
+        _COURSES_CACHE[dept] = load_courses(dept)
+    
+    return _COURSES_CACHE[dept].get(semester, [])

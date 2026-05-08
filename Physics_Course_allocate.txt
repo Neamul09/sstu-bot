@@ -1,0 +1,99 @@
+First Year First Semester
+Course Code Course Title Credit
+PHY 0533 1121 Mechanics and Properties of Matter 3.0
+MATH 0541 1123 Algebra and Trigonometry 3.0
+CHEM 0531 1125 Physical Chemistry 3.0
+ENG 0231 1127 Effective Communication in English 3.0
+SSS 0222 1129 History of the Emergence of Independent Bangladesh 3.0
+ENG 0231 1128 English Language Lab - I 1.0
+PHY 0533 1122 Mechanics and Properties of matter lab 2.0
+CHEM 0531 1126 Chemistry Practical 2.0
+Total Credits = 20
+
+
+First Year Second Semester
+Course Code Course Title Credit
+PHY 0533 1221 Heat and Thermodynamics 3.0
+ECO 0311 1223 Principles of Economics 3.0
+MATH 0541 1225 Geometry in Two and Three Dimensions 3.0
+CHEM 0531 1227 Inorganic and Organic Chemistry 3.0
+CSE 0714 1229 C-Programming 3.0
+PHY 0533 1222 Heat and thermodynamics lab 2.0
+CHEM 0531 1228 Chemistry Sessional – II 2.0
+CSE 0714 1230 C-Programming Sessional 1.0
+PHY 0533 1200 General Viva-1 1.0
+Total Credits = 21.0    
+
+
+Second Year First Semester
+Course Code Course Title Credit
+PHY 0533 2121 Electricity and magnetism 3.0
+PHY 0533 2123 Waves and Oscillation 3.0
+PHY 0533 2125 Mathematical Methods in Physics – I 3.0
+SOC 0314 2127 Principles of Sociology 3.0
+BUS 0411 2129 Accounting 3.0
+PHY 0533 2122 Electricity Lab 2.0
+PHY 0533 2124 Acoustic Lab 2.0
+Total Credits = 19.0
+
+
+Second Year Second Semester
+Course Code Course Title Credits
+PHY 0533 2221 Atomic and Molecular Physics 3.0
+PHY 0533 2223 Optics 3.0
+PHY 0533 2225 Mathematical Methods in Physics – II 3.0
+PHY 0533 2227 Statistical Mechanics 3.0
+STA 0542 2229 Basic Statistics and Probability 3.0
+PHY 0533 2224 Optics lab 2.0
+PHY 0533 2200 General Viva-2 1.0
+Total Credits = 18.0    
+
+Third Year First Semester
+Course Code Course Title Credit
+PHY 0533 3121 Electrodynamics – I 3.0
+PHY 0533 3123 Nuclear Physics-I 3.0
+PHY 0533 3125 Quantum Mechanics – I 3.0
+PHY 0533 3127 Electronics-I 3.0
+PHY 0533 3129 Classical Mechanics 3.0
+PHY 0533 3124 Nuclear Physics Lab 2.0
+PHY 0533 3128 Electronics lab-I 2.0
+Total Credits = 19.0
+
+
+Third Year Second Semester
+Course Code Course Title Credit
+PHY 0533 3221 Electrodynamics – II 3.0
+PHY 0533 3223 Solid State Physics – I 3.0
+PHY 0533 3225 Quantum Mechanics – II 3.0
+PHY 0533 3227 Electronics-II 3.0
+PHY 0533 3229 Astronomy and Cosmology 3.0
+PHY 0533 3228 Electronics lab-II 2.0
+PHY 0533 3200 Viva Voce-3 1.0
+Total Credits = 18.0
+
+
+Fourth Year First Semester
+Course Code Course Title Credit
+PHY 0533 4121 Nuclear Physics-II 3.0
+PHY 0533 4123 Digital Electronics 3.0
+PHY 0533 4125 Reactor Physics 3.0
+PHY 0533 4127 Nonlinear Optics-I 3.0
+PHY 0533 4129 Computational Physics-I 3.0
+PHY 0533 4131 Plasma Physics-I 3.0
+PHY 0533 4124 Digital Electronics Lab 2.0
+Total Credits = 17.0
+
+
+Fourth Year Second Semester
+Course Code Course Title Credit
+PHY 0533 4221 Solid State Physics –II 3.0
+PHY 0533 4223 Nonlinear Optics-II 3.0
+PHY 0533 4225 Computational Physics-II 3.0
+PHY 0533 4227 Plasma Physics –II 3.0
+PHY 0533 4229 Materials Science 3.0
+PHY 0533 4231 Nuclear radiation and Health Physics 3.0
+PHY 0533 4228 Project 3.0
+PHY 0533 4230 Physics Practical 3.0
+PHY 0533 4232 Study Tour/ Industrial Attachment 3.0
+PHY 0533 4200 Viva Voce-4 1.0
+Total Credits = 20.0

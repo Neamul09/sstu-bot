@@ -15,6 +15,7 @@ _translations = {
         "menu_deadlines": "🚨 Deadlines",
         "menu_notices": "📢 Notices",
         "menu_resources": "📚 Resources",
+        "menu_results": "📊 Result",
         "menu_profile": "⚙️ My Profile",
         "lang_toggle_btn": "🌍 Switch to Bangla (বাংলা)",
         "lang_switched": "✅ Language updated successfully!",
@@ -52,6 +53,11 @@ _translations = {
         "search_results": "🔍 *Search Results for '{query}'*:\n\n",
         "search_none": "❌ No results found matching your query.",
         
+        "results_title": "📊 *Academic Results*\n_Class: {dept} Semester {sem}_",
+        "results_empty": "No results have been recorded for this semester yet.",
+        "results_select_subject": "Select a subject to view your marks:",
+        "results_for_subject": "📊 *Results for {subject}*\n\n",
+        
         # We can add more strings here easily as the app scales
     },
     "bn": {
@@ -67,6 +73,7 @@ _translations = {
         "menu_deadlines": "🚨 ডেডলাইনসমূহ",
         "menu_notices": "📢 নোটিশ বোর্ড",
         "menu_resources": "📚 ক্লাসের রিসোর্স",
+        "menu_results": "📊 রেজাল্ট",
         "menu_profile": "⚙️ আমার প্রোফাইল",
         "lang_toggle_btn": "🌍 Switch to English",
         "lang_switched": "✅ ভাষা সফলভাবে পরিবর্তন করা হয়েছে!",
@@ -102,6 +109,10 @@ _translations = {
         "search_prompt": "🔍 *খুঁজুন*\n\nআপনার সেকশনের লাইব্রেরি বা বোর্ডে কিছু খুঁজতে একটি কীওয়ার্ড লিখুন:",
         "search_results": "🔍 *'{query}' এর জন্য ফলাফল*:\n\n",
         "search_none": "❌ আপনার কীওয়ার্ডের সাথে মেলা কোনো ফলাফল পাওয়া যায়নি।",
+        "results_title": "📊 *পরীক্ষার ফলাফল*\n_ক্লাস: {dept} সেমিস্টার {sem}_",
+        "results_empty": "এই সেমিস্টারের কোনো ফলাফল এখনো প্রকাশ করা হয়নি।",
+        "results_select_subject": "আপনার নম্বর দেখতে একটি বিষয় নির্বাচন করুন:",
+        "results_for_subject": "📊 *{subject} এর ফলাফল*\n\n",
     }
 }
 

@@ -136,7 +136,7 @@ async def add_slot_trigger(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     semester = user.get("semester", 0)
-    courses = get_courses(semester)
+    courses = get_courses(semester, user["department"])
 
     if courses:
         # Build course picker buttons (2 per row)
@@ -189,7 +189,7 @@ async def add_slot_subj_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = query.from_user.id
     user = Database.get_user(user_id)
     semester = user.get("semester", 0)
-    courses = get_courses(semester)
+    courses = get_courses(semester, user["department"])
 
     try:
         idx = int(query.data.split("_")[1])
