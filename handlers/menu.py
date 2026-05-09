@@ -28,6 +28,9 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [t("menu_results", lang), t("menu_profile", lang)]
     ]
     
+    if role.upper() == Config.ROLE_ADMIN:
+        keyboard.append(["👥 Admin Panel"])
+    
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     
     msg_text = (
@@ -90,6 +93,9 @@ async def handle_menu_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await view_notices(update, context)
     elif text in [t("menu_results", "en"), t("menu_results", "bn"), "📊 Result", "📊 রেজাল্ট", "Result", "রেজাল্ট"]:
         await view_results(update, context)
+    elif text == "👥 Admin Panel":
+        from handlers.manage_users import view_students_list
+        await view_students_list(update, context)
     elif text in [t("menu_profile", "en"), t("menu_profile", "bn")]:
         await send_profile(update, context, update.effective_user.id)
     else:
