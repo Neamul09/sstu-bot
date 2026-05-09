@@ -1,6 +1,7 @@
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from database import Database
+from config import Config
 from utils.i18n import t
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -11,8 +12,8 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ You are not registered yet. Use /start")
         return
 
-    role = user["role"]
-    lang = user.get("language", "en")
+    role = user.get("role", Config.ROLE_STUDENT) or Config.ROLE_STUDENT
+    lang = user.get("language", "en") or "en"
     
     if not user.get("is_approved", False):
         await update.message.reply_text(
