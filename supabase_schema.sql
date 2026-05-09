@@ -154,3 +154,15 @@ CREATE TABLE IF NOT EXISTS results (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_results_user ON results(user_id);
+
+-- 14. Create Course Results Table (Shared sheets)
+CREATE TABLE IF NOT EXISTS course_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    title TEXT NOT NULL, -- e.g. "CT-1 Result"
+    file_id TEXT NOT NULL,
+    file_type TEXT NOT NULL, -- 'PHOTO' or 'DOCUMENT'
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_course_results_class ON course_results(class_id);
