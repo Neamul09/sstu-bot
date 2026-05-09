@@ -108,19 +108,22 @@ async def get_sem(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Please verify and approve this student."
     )
     
+    notified = False
     for cr in crs:
         try:
             await context.bot.send_message(chat_id=cr["id"], text=admin_msg, reply_markup=approval_kb, parse_mode="Markdown")
+            notified = True
         except:
             pass
 
-    # Notify any admin as well
-    admins = supabase.table("users").select("id").eq("role", Config.ROLE_ADMIN).execute().data
-    for admin in admins:
-        try:
-            await context.bot.send_message(chat_id=admin["id"], text=admin_msg, reply_markup=approval_kb, parse_mode="Markdown")
-        except:
-            pass
+    # If no CR was notified (none found or all failed), notify Admins
+    if not notified:
+        admins = supabase.table("users").select("id").eq("role", Config.ROLE_ADMIN).execute().data
+        for admin in admins:
+            try:
+                await context.bot.send_message(chat_id=admin["id"], text=admin_msg, reply_markup=approval_kb, parse_mode="Markdown")
+            except:
+                pass
             
     await query.edit_message_text(
         text=f"✅ *Registration Submitted!*\n\nYour details have been sent to the **Batch CR** for approval.\n"
