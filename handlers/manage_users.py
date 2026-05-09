@@ -15,9 +15,8 @@ async def view_students_list(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # If Admin, show Batch Selection
     if user["role"] == Config.ROLE_ADMIN:
-        # Check if they already selected a batch
         data = query.data.split("_")
-        if len(data) == 1: # Just "view_students_list"
+        if query.data == "view_students_list":
             # Show Dept selection
             buttons = [InlineKeyboardButton(dept, callback_data=f"lstdept_{i}") for i, dept in enumerate(Config.DEPARTMENTS)]
             await query.edit_message_text(
