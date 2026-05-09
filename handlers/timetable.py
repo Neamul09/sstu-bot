@@ -9,6 +9,7 @@ from config import Config
 from telegram.error import BadRequest
 from utils.i18n import t
 import datetime
+import pytz
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -549,14 +550,12 @@ async def notify_sched_get_time(update: Update, context: ContextTypes.DEFAULT_TY
         
         # Combine date and time
         dt_str = f"{manual_date} {parsed_time}"
-        sched_dt = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+        sched_dt = datetime.datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
         
         # Adjust for local timezone
-        from config import Config
         local_tz = pytz.timezone(Config.TZ)
         sched_dt = local_tz.localize(sched_dt)
         
-        import pytz
         utc_sched_time = sched_dt.astimezone(pytz.UTC).isoformat()
         
         Database.add_scheduled_notification({
