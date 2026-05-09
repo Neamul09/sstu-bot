@@ -88,7 +88,7 @@ async def handle_menu_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await view_deadlines(update, context)
     elif text in [t("menu_notices", "en"), t("menu_notices", "bn")]:
         await view_notices(update, context)
-    elif text in [t("menu_results", "en"), t("menu_results", "bn")]:
+    elif text in [t("menu_results", "en"), t("menu_results", "bn"), "📊 Result", "📊 রেজাল্ট", "Result", "রেজাল্ট"]:
         await view_results(update, context)
     elif text in [t("menu_profile", "en"), t("menu_profile", "bn")]:
         await send_profile(update, context, update.effective_user.id)
