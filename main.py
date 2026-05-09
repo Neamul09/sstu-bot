@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 from config import Config
-from handlers.onboarding import onboarding_handler
+from handlers.onboarding import onboarding_handler, approval_handler
 from handlers.timetable import timetable_view_handler, timetable_nav_handler, timetable_add_handler, routine_view_handler, routine_upload_handler, slot_delete_handler, notify_instant_handler, notify_sched_handler
 from handlers.deadlines import deadline_view_handler, deadline_nav_handler, deadline_add_handler, deadline_delete_handler
 from handlers.notices import notice_view_handler, notice_nav_handler, notice_post_handler, notice_delete_handler, notice_search_handler
@@ -19,34 +19,27 @@ from handlers.resources import res_view_handler, res_nav_handler, res_click_hand
 from utils.scheduler import start_scheduler
 from database import Database
 
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+# Configure logging
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Health Check Server (Flask) ---
+# Flask app for health checks
 app = Flask(__name__)
 
-@app.route('/')
-@app.route('/health')
+@app.route("/")
 def health_check():
-    return "OK", 200
+    return "Bot is alive!", 200
 
 def run_flask():
-    # Render provides the PORT environment variable automatically
     port = int(os.environ.get("PORT", 8080))
-    # Using threaded=True is default for app.run but good to be explicit
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=port)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    logger.error("Exception while handling an update:", exc_info=context.error)
-    if isinstance(update, Update) and update.effective_message:
-        await update.effective_message.reply_text("❌ An error occurred. Please try again later.")
+    logger.error(msg="Exception while handling an update:", exc_info=context.error)
 
 def start_bot():
     if not Config.TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN not found in environment.")
+        logger.error("TELEGRAM_BOT_TOKEN not found in environment variables!")
         return
 
     # Start the Flask health check server in a background thread
@@ -54,6 +47,9 @@ def start_bot():
     logger.info("Health check server started in background.")
 
     application = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).read_timeout(30).connect_timeout(30).build()
+
+    # Callback Approval Handler (Must go early)
+    application.add_handler(approval_handler)
 
     # Conversation Handlers (Must go before fallbacks)
     application.add_handler(onboarding_handler)
@@ -110,7 +106,7 @@ def start_bot():
     start_scheduler(application)
 
     # Start the Bot
-    logger.info("Bot started... (V2 Rewrite Complete)")
+    logger.info("Bot started... (Approval System Live)")
     application.run_polling()
 
 if __name__ == "__main__":

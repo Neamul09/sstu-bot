@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
@@ -8,7 +8,7 @@ from telegram.ext import (
     filters,
 )
 from config import Config
-from database import Database
+from database import Database, supabase
 from utils.helpers import build_menu
 from utils.i18n import t
 
@@ -19,9 +19,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = Database.get_user(user_id)
 
-    lang = user.get("language", "en") if user else "en"
-
     if user:
+        lang = user.get("language", "en")
+        if not user.get("is_approved", False):
+            await update.message.reply_text(
+                "⏳ *Your registration is pending CR approval.*\n"
+                "Please wait while your batch CR verifies your information.",
+                parse_mode="Markdown"
+            )
+            return ConversationHandler.END
+            
         await update.message.reply_text(
             t("welcome_back", lang, name=user['full_name']),
             parse_mode="Markdown",
@@ -29,7 +36,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
-    # For new users, assume 'en' for onboarding, they can change later
+    # For new users
     await update.message.reply_text(
         t("welcome_start", "en"),
         parse_mode="Markdown",
@@ -39,7 +46,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["full_name"] = update.message.text
-    
     await update.message.reply_text(
         t("ask_id", "en", name=update.message.text),
         parse_mode="Markdown"
@@ -48,41 +54,25 @@ async def get_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["student_id"] = update.message.text
-    
-    # Build Department inline buttons
     buttons = [InlineKeyboardButton(dept, callback_data=f"dept_{i}") for i, dept in enumerate(Config.DEPARTMENTS)]
     reply_markup = build_menu(buttons, n_cols=1)
-    
-    await update.message.reply_text(
-        t("ask_dept", "en"),
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(t("ask_dept", "en"), reply_markup=reply_markup, parse_mode="Markdown")
     return GET_DEPT
 
 async def get_dept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
-    # Extract department index
     dept_idx = int(query.data.split("_")[1])
     department = Config.DEPARTMENTS[dept_idx]
     context.user_data["department"] = department
-    
-    # Build Semester inline buttons (grid 4x2)
     buttons = [InlineKeyboardButton(f"Semester {sem}", callback_data=f"sem_{sem}") for sem in Config.SEMESTERS]
     reply_markup = build_menu(buttons, n_cols=2)
-    
-    await query.edit_message_text(
-        text=t("ask_sem", "en", dept=department),
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
-    )
+    await query.edit_message_text(text=t("ask_sem", "en", dept=department), reply_markup=reply_markup, parse_mode="Markdown")
     return GET_SEM
 
 async def get_sem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer("Registration Complete!")
+    await query.answer("Registration Submitted!")
     
     semester = int(query.data.split("_")[1])
     data = context.user_data
@@ -91,21 +81,87 @@ async def get_sem(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "id": update.effective_user.id,
         "full_name": data["full_name"],
         "student_id": data["student_id"],
-        "language": "en", # Default
-        "role": Config.ROLE_STUDENT, # Automatically Auto-Approved Student
+        "language": "en",
+        "role": Config.ROLE_STUDENT,
         "department": data["department"],
-        "semester": semester
+        "semester": semester,
+        "is_approved": False # Default to False
     }
     
     Database.create_user(user_record)
     
-    summary = t("reg_complete", "en", name=data['full_name'], student_id=data['student_id'], dept=data['department'], sem=semester)
+    # Notify CRs
+    crs = supabase.table("users").select("id").eq("department", data["department"]).eq("semester", semester).eq("role", Config.ROLE_CR).execute().data
     
+    approval_kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Approve", callback_data=f"appr_{update.effective_user.id}"),
+            InlineKeyboardButton("❌ Reject", callback_data=f"rejt_{update.effective_user.id}")
+        ]
+    ])
+    
+    admin_msg = (
+        f"👤 *New Registration Request*\n\n"
+        f"Name: {data['full_name']}\n"
+        f"ID: {data['student_id']}\n"
+        f"Batch: {data['department']} Semester {semester}\n\n"
+        f"Please verify and approve this student."
+    )
+    
+    for cr in crs:
+        try:
+            await context.bot.send_message(chat_id=cr["id"], text=admin_msg, reply_markup=approval_kb, parse_mode="Markdown")
+        except:
+            pass
+
+    # Notify any admin as well
+    admins = supabase.table("users").select("id").eq("role", Config.ROLE_ADMIN).execute().data
+    for admin in admins:
+        try:
+            await context.bot.send_message(chat_id=admin["id"], text=admin_msg, reply_markup=approval_kb, parse_mode="Markdown")
+        except:
+            pass
+            
     await query.edit_message_text(
-        text=summary,
+        text=f"✅ *Registration Submitted!*\n\nYour details have been sent to the **Batch CR** for approval.\n"
+             f"You will be notified once they verify your access.",
         parse_mode="Markdown"
     )
     return ConversationHandler.END
+
+async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    action, target_id = query.data.split("_")
+    await query.answer()
+    
+    user = Database.get_user(target_id)
+    if not user:
+        await query.edit_message_text("❌ User not found.")
+        return
+
+    if action == "appr":
+        Database.update_user(target_id, {"is_approved": True})
+        await query.edit_message_text(f"✅ Approved {user['full_name']} ({user['student_id']})")
+        try:
+            await context.bot.send_message(
+                chat_id=target_id,
+                text=f"🎉 *Access Approved!*\n\nWelcome {user['full_name']}, your registration has been approved by the CR. Use /start to begin.",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
+    else:
+        # Rejection: Just delete the user record or keep as rejected?
+        # User might want to try again, so let's delete
+        supabase.table("users").delete().eq("id", target_id).execute()
+        await query.edit_message_text(f"❌ Rejected and removed {user['full_name']}")
+        try:
+            await context.bot.send_message(
+                chat_id=target_id,
+                text="❌ *Access Denied*\n\nYour registration request was rejected by the Batch CR. If this was a mistake, please contact your CR."
+            )
+        except:
+            pass
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(t("reg_cancelled", "en"))
@@ -122,3 +178,5 @@ onboarding_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", cancel)],
     per_message=False
 )
+
+approval_handler = CallbackQueryHandler(handle_approval, pattern="^(appr_|rejt_)")

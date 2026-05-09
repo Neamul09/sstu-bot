@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     pref_deadline_reminders BOOLEAN DEFAULT TRUE,
     pref_daily_digest BOOLEAN DEFAULT TRUE,
     pref_notices BOOLEAN DEFAULT TRUE,
+    is_approved BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

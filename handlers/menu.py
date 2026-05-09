@@ -14,6 +14,14 @@ async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     role = user["role"]
     lang = user.get("language", "en")
     
+    if not user.get("is_approved", False):
+        await update.message.reply_text(
+            "⏳ *Your registration is pending CR approval.*\n"
+            "Please wait while your batch CR verifies your information.",
+            parse_mode="Markdown"
+        )
+        return
+    
     keyboard = [
         [t("menu_timetable", lang), t("menu_resources", lang)],
         [t("menu_deadlines", lang), t("menu_notices", lang)],
@@ -58,6 +66,9 @@ async def handle_menu_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user = Database.get_user(update.effective_user.id)
     if not user: return
+    if not user.get("is_approved", False):
+        await update.message.reply_text("⏳ Your access is pending approval.")
+        return
     lang = user.get("language", "en") or "en"
     
     # Trigger functions based on persistent menu click
