@@ -14,6 +14,7 @@ from handlers.admin import teacher_class_handler
 from handlers.menu import menu_handler, handle_menu_click, lang_toggle_handler, settings_view_handler, pref_toggle_handler, profile_back_handler
 from handlers.poll import poll_handler, poll_view_handler, poll_delete_handler
 from handlers.manage_class import manage_class_handler
+from handlers.manage_users import students_list_handler
 from handlers.results import results_nav_handler, results_back_handler, results_add_handler, result_file_handler
 from handlers.resources import res_view_handler, res_nav_handler, res_click_handler, res_add_handler, res_delete_handler, res_search_handler
 from utils.scheduler import start_scheduler
@@ -96,6 +97,7 @@ def start_bot():
     application.add_handler(results_nav_handler)
     application.add_handler(results_back_handler)
     application.add_handler(result_file_handler)
+    application.add_handler(students_list_handler)
 
     # Persistent Menu clicks
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_click))

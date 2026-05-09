@@ -104,6 +104,7 @@ async def view_timetable(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user["role"] in [Config.ROLE_CR, Config.ROLE_TEACHER, Config.ROLE_ADMIN]:
         footer.append(InlineKeyboardButton("➕ Add New Class", callback_data="add_slot_trigger"))
         footer.append(InlineKeyboardButton(t("btn_upload_routine", lang), callback_data="upload_routine_trigger"))
+        footer.append(InlineKeyboardButton("👥 Student List", callback_data="view_students_list"))
         # Add delete buttons for today's slots
         if slots:
             for slot in slots:
